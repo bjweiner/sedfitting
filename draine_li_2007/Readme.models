@@ -1,0 +1,115 @@
+
+from http://www.astro.princeton.edu/~draine/dust/irem.html
+
+tar zxvf DL07.spec.tgz
+
+make lists of selected sets of the models, like
+list.U1.00.model_subset1
+
+which is basically
+U1.00/U1.00_*_LMC2_05.txt
+U1.00/U1.00_*_MW3.1_00.txt
+U1.00/U1.00_*_MW3.1_30.txt
+U1.00/U1.00_*_MW3.1_60.txt
+U1.00/U1.00_*_smc.txt
+
+but omits the 1e2 models, like U1.00/U1.00_1e2_LMC2_05.txt, because those files don't
+have anything in them beyond the header.
+
+try this:
+rm ztmp1
+for umin in 0.10 0.30 1.00 3.00 12.0 1e2 1e3 1e4
+do 
+  ls -l U${umin}/U${umin}_*_smc.txt >> ztmp1
+  ls -l U${umin}/U${umin}_*_LMC2_05.txt >> ztmp1
+  ls -l U${umin}/U${umin}_*_MW3.1_00.txt >> ztmp1
+  ls -l U${umin}/U${umin}_*_MW3.1_30.txt >> ztmp1
+  ls -l U${umin}/U${umin}_*_MW3.1_60.txt >> ztmp1
+done
+mv ztmp1 list.models.largesubset.withsize
+awk '{if ($5>10000) print $9}' list.models.largesubset.withsize > list.models.largesubset1
+
+to get rid of the empty models, which are not just the umax=1e2 but
+also some of the higher U LMC, smc models, etc
+
+----------
+
+Copied from python/sedfitting/Readme.testing
+
+Look at what Magnelli 2012 and Magdis 2012 did
+
+Magnelli 1210.2760v2
+Magnelli constructs a grid of DL models following DL suggestions:
+fix Umax = 1e6 and use 0.7 < Umin < 25, to avoid fitting very cold 
+components when submm data not available
+grid over q_PAH from 0.47% - 4.6%, Umin 0.7 - 25, gamma 0.0-0.3
+(gamma is fraction in the power law distrib of U, 1-gamma is in 
+diffuse medium at Umin).
+
+For each template they find normalization by minimizing chi-sq,
+and determine an Mdust, L_IR, and SFR from L_IR. They assign
+a final value and 1-sigma uncertainty by taking geometric mean 
+of all fits within the param space that has chi-sq < chi_min-sq + 1.
+(Not sure how they get uncertainty - perhaps the rms in log?)
+They claim the DL models are good fits, with median chi-sq = 1.8
+for N_dof = 1.  
+
+I don't know what that chi-sq means because they should
+have 4 to 6 photometric data points and 1 parameter, so 3-5 dof.
+All of their galaxies have fluxes at 24, 100, 160, 250 um,
+and some have 350 um, a few have 70, 500, and only a couple
+have 850 um or longer.  The uncertainties on S24 are small, 
+S100 and S250 are relatively small (often 10-20%).
+
+Apart from the two high-z galaxies ther galaxies are mostly at
+about the same z, the IR fluxes are in a relatively narrow range,
+IR dust masses are from 8.56-9.33, and errors on mass are
+0.02 - 0.42 dex. Many of them have errors < 0.15 dex which
+seems optimistic.
+
+Magdis 2012
+
+
+
+To do models with gamma I would need to combine as in the DL07 Readme:
+  j_nu = (1-gamma)*j_nu[umin,umin] + gamma*j_nu[umin,umax]
+
+Wrote composite_draineli_sed to do this
+
+In the DL models in the range Magnelli took, 
+U0.70 to U25.0 = 16 values
+always Umax 1e6
+PAHs: table3 of Draine & Li says 0.47-4.58% PAH are models 1-7 ie MW3.1_00 to MW3.1_60
+gamma: could use four values 0.0, 0.1, 0.2, 0.3
+that would be 448 models, but I could probably use 10-12 Umin values,
+only 3-4 PAH values, and 4 gammas to bring it to ~144 models
+
+might also want to add 1 each LMC and SMC models?
+
+So try making lists for such a subset.  Make two matching lists,
+one with umin-umax and another with umin-umin
+
+rm ztmp1 ztmp2
+umax=1e6
+for umin in 0.70 1.00 1.50 2.00 2.50 3.00 5.00 8.00 12.0 15.0 20.0 25.0
+do
+  for model in smc LMC2_05 MW3.1_00 MW3.1_30 MW3.1_60
+  do 
+    ls -l U${umin}/U${umin}_${umax}_${model}.txt >> ztmp1
+    ls -l U${umin}/U${umin}_${umin}_${model}.txt >> ztmp2
+  done
+done
+mv ztmp1 list.composite_models1.umax.withsize
+mv ztmp2 list.composite_models1.umin.withsize
+# check for empty models
+awk '{if ($5<10000) print $9}' list.composite_models1.umax.withsize
+awk '{if ($5<10000) print $9}' list.composite_models1.umin.withsize
+# didn't find any, so print the names
+awk '{if ($5>10000) print $9}' list.composite_models1.umax.withsize > list.composite_models1.umax
+awk '{if ($5>10000) print $9}' list.composite_models1.umin.withsize > list.composite_models1.umin
+
+There are 60 of these, then if I combine them with 4 different gamma
+ratios I'll have 240 models.
+
+
+
